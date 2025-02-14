@@ -173,3 +173,5 @@ cython_debug/
 # blend
 *.blender
 *.png
+
+data/smplx_model_20210421.blend
