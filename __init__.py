@@ -1103,6 +1103,7 @@ class SMPLXAddAnimation(bpy.types.Operator, ImportHelper):
                 pose_rodrigues = current_pose[index]
                 set_pose_from_rodrigues(armature, bone_name, pose_rodrigues)
                 armature.pose.bones[bone_name].keyframe_insert('rotation_quaternion', frame=current_frame)
+            #bpy.ops.object.smplx_set_poseshapes()
 
             if self.keyframe_corrective_pose_weights:
                 # Calculate corrective poseshape weights for current pose and keyframe them.
