@@ -993,16 +993,27 @@ class SMPLXAddAnimation(bpy.types.Operator, ImportHelper):
             
             # shape of betas should be the same with poses repeat betas to match poses
             betas = np.array([betas for i in range(poses.shape[0])])
+            
+            # interpolate shape form 0 to betas[120] in 120 frames
+            betas[0,:] = np.zeros(16)
+            betas[0,1]=-5.0 
+            for i in range(120):
+                betas[i] = betas[0] * (1 - i/120) + betas[120] * i/120
 
             trans = np.concatenate((np.zeros((120, 3)),trans),axis=0)
-            trans = trans + [0,0.86748,0] # stand on ground
+            
+            # set avatar to stand on ground
+            #trans = trans + [0,0,0.86748] 
+            #bpy.ops.object.smplx_snap_ground_plane()
+
             print(f' trans shape : {trans.shape}')
-            print(f' betas shape : {betas}')
+            print(f' betas shape : {betas.shape}')
             print(f' poses shape : {poses.shape}')
+            print(f' betas : {betas}')
             if mocap_framerate < target_framerate:
                 self.report({"ERROR"}, f"Mocap framerate ({mocap_framerate}) below target framerate ({target_framerate})")
                 return {"CANCELLED"}
-
+            
         if (context.active_object is not None):
             bpy.ops.object.mode_set(mode='OBJECT')
 
@@ -1087,6 +1098,7 @@ class SMPLXAddAnimation(bpy.types.Operator, ImportHelper):
                 key_block_name = f"Shape{i:03}"
                 if key_block_name in obj.data.shape_keys.key_blocks:
                     obj.data.shape_keys.key_blocks[key_block_name].value = beta
+                    obj.data.shape_keys.key_blocks[key_block_name].keyframe_insert("value", frame=current_frame)
             bpy.ops.object.smplx_update_joint_locations('EXEC_DEFAULT')
 
             for index, bone_name in enumerate(SMPLX_JOINT_NAMES):
