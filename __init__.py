@@ -1066,6 +1066,7 @@ class SMPLXAddAnimation(bpy.types.Operator, ImportHelper):
 
         # Keyframe poses
         step_size = int(mocap_framerate / target_framerate)
+        step_size = 1
         print(f' mo cap framerate : {mocap_framerate}')
         print(f' mo cap framerate : {target_framerate}')
 
