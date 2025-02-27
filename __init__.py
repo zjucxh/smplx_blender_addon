@@ -1137,6 +1137,10 @@ class SMPLXAddAnimation(bpy.types.Operator, ImportHelper):
 
         print(f"  {num_keyframes}/{num_keyframes}")
         context.scene.frame_set(1)
+        # TODO Scale up avatar 40 times for better cloth simulation reslult
+        # TODO Add Tshirt
+        # TODO Simulate
+        # TODO Export simulation results
 
 
         return {'FINISHED'}
