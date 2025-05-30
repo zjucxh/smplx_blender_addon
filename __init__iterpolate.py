@@ -975,15 +975,45 @@ class SMPLXAddAnimation(bpy.types.Operator, ImportHelper):
                 return {"CANCELLED"}
 
             trans = data["trans"]
+            #print(' trans : {0}'.format(trans))
+            trans = np.zeros_like(trans)
             gender = str(data["gender"])
+            gender = "female"
             mocap_framerate = int(data["mocap_frame_rate"]) if "mocap_frame_rate" in data else int(data["mocap_framerate"])
             betas = data["betas"]
+            
+            # betas in dim 0
             poses = data["poses"]
+            # TODO interpolate poses from 0 to poses[0] in 120 frames
+            prefix_poses = np.zeros((120, poses.shape[1]))
+            #print(f' poses : {poses}')
+            for i in range(120):
+                prefix_poses[i] = prefix_poses[0] * (1 - i/120) + poses[0] * i/120
+            poses = np.concatenate((prefix_poses, poses), axis=0)
+            
+            # shape of betas should be the same with poses repeat betas to match poses
+            betas = np.array([betas for i in range(poses.shape[0])])
+            
+            # interpolate shape form 0 to betas[120] in 120 frames
+            betas[0,:] = np.zeros(16)
+            betas[0,1]=-5.0 
+            for i in range(120):
+                betas[i] = betas[0] * (1 - i/120) + betas[120] * i/120
 
+            trans = np.concatenate((np.zeros((120, 3)),trans),axis=0)
+            
+            # set avatar to stand on ground
+            #trans = trans + [0,0,0.86748] 
+            #bpy.ops.object.smplx_snap_ground_plane()
+
+            print(f' trans shape : {trans.shape}')
+            print(f' betas shape : {betas.shape}')
+            print(f' poses shape : {poses.shape}')
+            print(f' betas : {betas}')
             if mocap_framerate < target_framerate:
                 self.report({"ERROR"}, f"Mocap framerate ({mocap_framerate}) below target framerate ({target_framerate})")
                 return {"CANCELLED"}
-
+            
         if (context.active_object is not None):
             bpy.ops.object.mode_set(mode='OBJECT')
 
@@ -1002,18 +1032,19 @@ class SMPLXAddAnimation(bpy.types.Operator, ImportHelper):
         context.scene.frame_start = 1
 
         # Set shape and update joint locations
-        bpy.ops.object.mode_set(mode='OBJECT')
-        for index, beta in enumerate(betas):
-            key_block_name = f"Shape{index:03}"
+        #bpy.ops.object.mode_set(mode='OBJECT')
+        #for index, beta in enumerate(betas):
+        #    #print(f' betas : {betas}')
+        #    key_block_name = f"Shape{index:03}"
 
-            if key_block_name in obj.data.shape_keys.key_blocks:
-                obj.data.shape_keys.key_blocks[key_block_name].value = beta
-            else:
-                print(f"ERROR: No key block for: {key_block_name}")
+        #    if key_block_name in obj.data.shape_keys.key_blocks:
+        #        obj.data.shape_keys.key_blocks[key_block_name].value = beta
+        #    #else:
+        #    #    print(f"ERROR: No key block for: {key_block_name}")
 
-        bpy.ops.object.smplx_update_joint_locations('EXEC_DEFAULT')
+        #bpy.ops.object.smplx_update_joint_locations('EXEC_DEFAULT')
 
-        height_offset = 0
+        height_offset = 0.0
         if self.rest_position == "GROUNDED":
             bpy.ops.object.smplx_snap_ground_plane('EXEC_DEFAULT')
             height_offset = armature.location[2]
@@ -1035,9 +1066,15 @@ class SMPLXAddAnimation(bpy.types.Operator, ImportHelper):
 
         # Keyframe poses
         step_size = int(mocap_framerate / target_framerate)
+        step_size = 1
+        print(f' mo cap framerate : {mocap_framerate}')
+        print(f' mo cap framerate : {target_framerate}')
+
 
         num_frames = trans.shape[0]
         num_keyframes = int(num_frames / step_size)
+        print(f' step size : {step_size}')
+        print(f' num_frames : {num_frames}')
 
         if self.keyframe_corrective_pose_weights:
             print(f"Adding pose keyframes with keyframed corrective pose weights: {num_keyframes}")
@@ -1056,6 +1093,15 @@ class SMPLXAddAnimation(bpy.types.Operator, ImportHelper):
             current_frame = index + 1
             current_pose = poses[frame].reshape(-1, 3)
             current_trans = trans[frame]
+            current_beta = betas[index]
+            bpy.ops.object.mode_set(mode='OBJECT')
+            for i, beta in enumerate(current_beta):
+                key_block_name = f"Shape{i:03}"
+                if key_block_name in obj.data.shape_keys.key_blocks:
+                    obj.data.shape_keys.key_blocks[key_block_name].value = beta
+                    obj.data.shape_keys.key_blocks[key_block_name].keyframe_insert("value", frame=current_frame)
+            bpy.ops.object.smplx_update_joint_locations('EXEC_DEFAULT')
+
             for index, bone_name in enumerate(SMPLX_JOINT_NAMES):
                 if bone_name == "pelvis":
                     # Keyframe pelvis location
@@ -1070,6 +1116,7 @@ class SMPLXAddAnimation(bpy.types.Operator, ImportHelper):
                 pose_rodrigues = current_pose[index]
                 set_pose_from_rodrigues(armature, bone_name, pose_rodrigues)
                 armature.pose.bones[bone_name].keyframe_insert('rotation_quaternion', frame=current_frame)
+            #bpy.ops.object.smplx_set_poseshapes()
 
             if self.keyframe_corrective_pose_weights:
                 # Calculate corrective poseshape weights for current pose and keyframe them.
@@ -1090,6 +1137,11 @@ class SMPLXAddAnimation(bpy.types.Operator, ImportHelper):
 
         print(f"  {num_keyframes}/{num_keyframes}")
         context.scene.frame_set(1)
+        # TODO Scale up avatar 40 times for better cloth simulation reslult
+        # TODO Add Tshirt
+        # TODO Simulate
+        # TODO Export simulation results
+
 
         return {'FINISHED'}
 
